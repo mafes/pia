@@ -165,6 +165,7 @@ fhelp()						# Help function.
 	-m	- Enable PIA MACE ad blocking.
 	-k	- Enable internet killswitch.
 	-x	- Encrypt the credetials file.
+	-g	- Enable gateway.
 	-v	- Display verbose information.
 	-h	- Display this help.
 
@@ -611,7 +612,7 @@ if [[ ! -f $VPNPATH/pass.txt && ! -f $VPNPATH/pass.enc ]];then
 	unset USERNAME PASSWORD
 fi
 
-while getopts "lhupnmkdfvxes:" opt
+while getopts "lhupnmkdfvxesg:" opt
 do
 	case $opt in
 		l) flist;exit 0;;
