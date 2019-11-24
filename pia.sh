@@ -12,6 +12,8 @@
 ## GNU General Public License at (http://www.gnu.org/licenses/) for
 ## more details.
 
+VPN_DNS="209.222.18.222 209.222.18.218"
+
 fupdate()						# Update the PIA openvpn files.
 {
 	CONFIGDEFAULT="https://www.privateinternetaccess.com/openvpn/openvpn.zip"
@@ -94,7 +96,7 @@ ffirewall()						# Set up iptables firewall rules to only allow traffic on tunne
 	iptables -P OUTPUT DROP																# default policy for outgoing packets
 	iptables -P INPUT DROP																# default policy for incoming packets
 	iptables -P FORWARD DROP															# default policy for forwarded packets
-
+	
 	# allowed outputs
 	iptables -A OUTPUT -o lo -j ACCEPT													# enable localhost out
 	iptables -A OUTPUT -o $VPNDEVICE -j ACCEPT											# enable outgoing connections on tunnel
@@ -116,6 +118,16 @@ ffirewall()						# Set up iptables firewall rules to only allow traffic on tunne
 	if [ $FLAN -eq 1 ];then
 		iptables -A OUTPUT -o $DEFAULTDEVICE -d $LAN -j ACCEPT							# enable incoming and outgoing connections within LAN (potentially dangerous!)
 		iptables -A INPUT -i $DEFAULTDEVICE -s $LAN -j ACCEPT
+	fi
+	
+	if [ $GATEWAY -eq 1 ];then
+		# forwarding
+		iptables -t nat -A POSTROUTING -o $VPNDEVICE -j MASQUERADE
+		iptables -A FORWARD -i $VPNDEVICE -o $DEFAULTDEVICE -m state --state RELATED,ESTABLISHED -j ACCEPT
+		iptables -A FORWARD -i $DEFAULTDEVICE -o $VPNDEVICE -j ACCEPT
+		# enable ssh
+		iptables -A TCP -s $LAN -p tcp --dport 22 -j ACCEPT
+		echo "$INFO Gateway enabled."
 	fi
 	echo "$INFO Firewall enabled."
 }
@@ -582,6 +594,7 @@ UNLOCK=0
 UPDATEOUTPUT=0
 ENCRYPT=0
 CREDS=0
+GATEWAY=0
 
 						# Check if user is root.
 if [ $(id -u) != 0 ];then echo "$ERROR Script must be run as root." && exit 1;fi
@@ -614,6 +627,7 @@ do
 		v) VERBOSE=1;fgetip&;;
 		x) ENCRYPT=1;;
 		s) SERVERNUM=$OPTARG;;
+		g) GATEWAY=1;FIREWALL=1;;
 		*) echo "$ERROR Error: Unrecognized arguments.";fhelp;exit 1;;
 	esac
 done
