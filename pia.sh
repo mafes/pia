@@ -121,14 +121,23 @@ ffirewall()						# Set up iptables firewall rules to only allow traffic on tunne
 	fi
 	
 	if [ $GATEWAY -eq 1 ];then
-		# forwarding
+		# forward traffic
 		iptables -t nat -A POSTROUTING -o $VPNDEVICE -j MASQUERADE
 		iptables -A FORWARD -i $VPNDEVICE -o $DEFAULTDEVICE -m state --state RELATED,ESTABLISHED -j ACCEPT
 		iptables -A FORWARD -i $DEFAULTDEVICE -o $VPNDEVICE -j ACCEPT
-		# enable ssh
-		iptables -A TCP -s $LAN -p tcp --dport 22 -j ACCEPT
+		# forward dns requests
+		for dns in $VPN_DNS
+		do
+			iptables -t nat -A PREROUTING -i $DEFAULTDEVICE -p tcp --dport 53 -j DNAT --to $dns
+			iptables -t nat -A PREROUTING -i $DEFAULTDEVICE -p udp --dport 53 -j DNAT --to $dns
+		done
 		echo "$INFO Gateway enabled."
 	fi
+
+        # enable ssh
+	iptables -A INPUT -i $DEFAULTDEVICE -p tcp --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+	iptables -A OUTPUT -o $DEFAULTDEVICE -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
+
 	echo "$INFO Firewall enabled."
 }
 
@@ -148,6 +157,10 @@ flockdown()
 	iptables -P OUTPUT DROP
 	iptables -P INPUT DROP
 	iptables -P FORWARD DROP
+
+        # enable ssh
+        iptables -A INPUT -i $DEFAULTDEVICE -p tcp --dport 22 -m state --state NEW,ESTABLISHED -j ACCEPT
+        iptables -A OUTPUT -o $DEFAULTDEVICE -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
 }
 
 fhelp()						# Help function.
@@ -612,7 +625,7 @@ if [[ ! -f $VPNPATH/pass.txt && ! -f $VPNPATH/pass.enc ]];then
 	unset USERNAME PASSWORD
 fi
 
-while getopts "lhupnmkdfvxesg:" opt
+while getopts "lhupnmkdfvxegs:" opt
 do
 	case $opt in
 		l) flist;exit 0;;
@@ -627,8 +640,8 @@ do
 		e) FLAN=1;FIREWALL=1;;
 		v) VERBOSE=1;fgetip&;;
 		x) ENCRYPT=1;;
-		s) SERVERNUM=$OPTARG;;
 		g) GATEWAY=1;FIREWALL=1;;
+		s) SERVERNUM=$OPTARG;;
 		*) echo "$ERROR Error: Unrecognized arguments.";fhelp;exit 1;;
 	esac
 done
